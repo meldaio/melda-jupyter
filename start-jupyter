@@ -1,0 +1,42 @@
+#!/bin/bash
+
+service ssh start
+service dbus start
+
+# mount user project files to the notebook.
+echo $AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY > /root/.passwd-s3fs
+chmod 400 /root/.passwd-s3fs
+
+s3fs $BUCKET_NAME:/$PROJECT_FOLDER $JUPYTER_WORKDIR \
+     -o dbglevel=debug \
+     -o passwd_file=/root/.passwd-s3fs \
+     -o curldbg \
+     -o umask=0007,uid=1001,gid=1001 \
+     -o allow_other
+
+rm -f /root/.passwd-s3fs
+
+set-paths
+chown -R $username:$username $UHOME
+
+# iptables rules.
+export PGEO_IPS=164.68.120.21,144.91.91.58,54.217.188.167
+
+iptables -P INPUT DROP
+iptables -P OUTPUT DROP
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
+iptables -A INPUT -s $PGEO_IPS -j ACCEPT
+iptables -A INPUT -s $PGEO_IPS -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED -j ACCEPT
+
+# start version check script, detached.
+sudo su $username -c "export PATH=$PATH && cd $UHOME && \
+		      python3 version_check_webservice.py &>version_script_log & disown"
+
+# export variables from root to melda user and
+# start the notebook with a startup script.
+sudo su $username -c "export PYTHONPATH=$PYTHONPATH:$PYTHON_PLUGIN_PATH && \
+                      jupyter notebook"

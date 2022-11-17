@@ -1,0 +1,65 @@
+FROM rocker/r-ubuntu:20.04
+
+RUN apt-get -qq update && apt-get -qq dist-upgrade
+
+# Add r2u repo and upgrade packages that come within.
+RUN wget -q -O- https://eddelbuettel.github.io/r2u/assets/dirk_eddelbuettel_key.asc \
+    | tee -a /etc/apt/trusted.gpg.d/cranapt_key.asc && \
+    echo "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu focal main" \
+    > /etc/apt/sources.list.d/cranapt.list && \
+    apt-get -qq update && apt-get -qq upgrade
+
+# Add repo pinning to ensure packages from CRANapt is installed by default.
+RUN echo "Package: *" > /etc/apt/preferences.d/99cranapt && \
+    echo "Pin: release o=CRAN-Apt Project" >> /etc/apt/preferences.d/99cranapt && \
+    echo "Pin: release l=CRAN-Apt Packages" >> /etc/apt/preferences.d/99cranapt && \
+    echo "Pin-Priority: 700"  >> /etc/apt/preferences.d/99cranapt
+
+# Install all needed packages in one go.
+RUN apt-get -qq update && \
+    apt-get -qq install python3-pip \
+                        s3fs openssh-server \
+                        sudo iptables
+
+# Intall jupyter, and install&enable bspm and R kernel.
+RUN pip install jupyter==1.0.0
+RUN sudo Rscript --vanilla -e \
+          'install.packages("bspm", repos="https://cran.r-project.org")' 
+RUN echo "bspm::enable()" >> /etc/R/Rprofile.site
+RUN Rscript -e "install.packages('IRkernel')"
+RUN Rscript -e "IRkernel::installspec(user=FALSE)"
+
+# Set env vars for R, Python, and Jupyter.
+ENV username=melda
+ENV UHOME=/home/$username
+ENV JUPYTER_WORKDIR=$UHOME/project
+# Add an executable path.
+ENV SRC=/usr/src/melda-jupyter
+ENV PATH=$SRC:$PATH
+
+# SSH config for remote access.
+RUN printf "\nPermitRootLogin prohibit-password\nPasswordAuthentication no\n" >> \
+        etc/ssh/sshd_config
+COPY id_melda.pub /root/.ssh/authorized_keys
+
+# Create the main user.
+RUN useradd $username --create-home --shell /bin/bash --uid 1001 -U
+
+# Create the folder for projects.
+RUN mkdir -p $JUPYTER_WORKDIR
+
+# Copy scripts to SRC, where we can use them as executables.
+COPY set-paths start-jupyter $SRC/
+# Copy jupyter config.
+COPY jupyter_notebook_config.py $UHOME/.jupyter/
+
+# Copy and install dependencies for the version check script/webservice. 
+RUN pip install flask
+COPY --chown=melda version_check_webservice.py $UHOME
+COPY --chown=melda get-versions $SRC/
+RUN chmod 770 $SRC/*
+
+# Set working directory.
+WORKDIR $JUPYTER_WORKDIR
+
+CMD start-jupyter

@@ -1,0 +1,48 @@
+FROM 284175468194.dkr.ecr.eu-west-1.amazonaws.com/melda-jupyter-base:20_04_R-4.2.2_python-3.8.10
+
+# Something like "essential data science."  
+RUN Rscript -e "install.packages(c('devtools', 'tidyverse', \
+                'reticulate', 'vctrs', \
+                'shiny', 'pillar', 'stats', \
+                'pkgdown', 'curl', 'processx', \
+                'fs', 'yaml', 'ragg', 'rgeos', \
+                'rgl', 'data.table', 'callr', \
+                'withr', 'lme4', 'scales', 'vroom', \
+                'nloptr', 'Rcpp', 'car', 'ps', 'testthat', \
+                'rmarkdown', 'bslib', 'minqa', 'fansi', \
+                'sass', 'isoband', 'generics', 'htmltools', \
+                'utf8', 'plotly', 'mlr3', 'XGBoost', \
+                'caret', 'Esquisse', 'BioConductor', \
+                'gridExtra', 'latticeExtra', 'microbenchmark', \
+                'arm', 'conjurer', 'corrplot', 'cluster', \ 
+                'dendextend', 'e1071', 'factoextra', 'formattable', \
+                'GGally', 'latex2exp', 'mlr', 'palmerpenguins', \
+                'randomForest', 'rpart', 'waterfall', \
+                'sys', 'pkgconfig', 'ellipsis', 'zoo', 'viridisLite', \
+                'gtable', 'farver', 'evaluate', 'xml2', 'colorspace', \
+                'carData', 'broom', 'readxl', 'munsell', 'labeling', \
+                'fastmap', 'tzdb', 'rstatix', 'prettyunits', 'highr', \
+                'cachem', 'renv', 'rstudioapi', 'rematch2', 'maptools'))"
+
+## for pysaprk.
+RUN apt-get -qq update && apt-get -qq install \
+                            python3-dev libmysqlclient-dev
+
+RUN pip install --upgrade pip
+## pip has a hard time installing a lot of packages at one go.
+RUN pip install Cython cmake \
+                matplotlib seaborn ggplot plotly \
+                folium Bqplot VisPy Altair Bokeh pydot
+RUN pip install numpy pandas scipy spacy eli5 LIME SHAP \
+                requests beautifulsoup4 urllib3 scrapy selenium
+RUN pip install scikit-learn lightGBM auto-sklearn FLAML \
+                XGBoost CatBoost Statsmodels NLTK Gensim \
+                TensorFlow Keras torch
+RUN pip install PyCaret FastAI pytorch-lightning optuna spaCy \
+                h2o tpot transformers Pillow opencv-python Theano
+RUN pip install Librosa Annoy Pattern Prophet scikit-optimize \
+                Nevergrad pandas-profiling Dask pyspark
+
+RUN get-versions
+
+CMD start-jupyter
